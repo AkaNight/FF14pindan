@@ -18,27 +18,78 @@
         <!-- 身份选择 -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <h3 class="text-sm text-gray-400 mb-2">你是谁？</h3>
-            <div class="flex gap-2 flex-wrap" id="identityButtons">
-                <button onclick="setIdentity('车头')" class="identity-btn bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-sm">
-                    我是车头
+            <div class="flex gap-2 flex-wrap" id="identityButtons"></div>
+            <p class="text-xs text-gray-500 mt-2">当前身份：<span id="currentIdentity" class="text-amber-400">未选择</span></p>
+        </div>
+
+        <!-- 车头收款信息（车头编辑/乘客查看） -->
+        <div id="paymentInfoSection" class="bg-gray-800 rounded-lg p-4 mb-6 hidden">
+            <h2 class="text-lg font-bold mb-3">💰 收款信息</h2>
+            <!-- 车头编辑模式 -->
+            <div id="paymentEditMode" class="hidden space-y-3">
+                <input
+                    type="text"
+                    id="driverName"
+                    placeholder="车头昵称（如：小明）"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                >
+                <select id="paymentMethod" class="w-full bg-gray-700 rounded px-3 py-2 text-white">
+                    <option value="alipay">支付宝</option>
+                    <option value="wechat">微信</option>
+                    <option value="both">都可以</option>
+                </select>
+                <input
+                    type="text"
+                    id="paymentAccount"
+                    placeholder="收款账号/手机号"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                >
+                <textarea
+                    id="paymentNote"
+                    placeholder="备注（如：转账请备注游戏ID）"
+                    rows="2"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                ></textarea>
+                <button onclick="savePaymentInfo()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded">
+                    保存收款信息
                 </button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">当前身份：<span id="currentIdentity" class="text-amber-400">未选择</span></p>
+            <!-- 乘客查看模式 -->
+            <div id="paymentViewMode" class="hidden">
+                <div class="bg-gray-700 rounded p-3 space-y-2">
+                    <p><span class="text-gray-400">车头：</span><span id="viewDriverName" class="text-white"></span></p>
+                    <p><span class="text-gray-400">收款方式：</span><span id="viewPaymentMethod" class="text-white"></span></p>
+                    <p><span class="text-gray-400">账号：</span><span id="viewPaymentAccount" class="text-amber-400 font-mono"></span>
+                        <button onclick="copyAccount()" class="ml-2 text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded">复制</button>
+                    </p>
+                    <p id="viewPaymentNote" class="text-sm text-gray-400"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 我的付款状态（乘客视角） -->
+        <div id="myPaymentSection" class="bg-blue-900 rounded-lg p-4 mb-6 hidden">
+            <h2 class="text-lg font-bold mb-3 text-blue-400">💳 我的付款</h2>
+            <div class="flex justify-between items-center mb-3">
+                <span>应付金额：</span>
+                <span id="myPaymentAmount" class="text-xl text-amber-400 font-bold">¥0</span>
+            </div>
+            <div id="myPaymentStatus" class="text-center py-2 rounded"></div>
+        </div>
+
+        <!-- 我的兑换码（乘客视角） -->
+        <div id="myCodesSection" class="bg-green-900 rounded-lg p-4 mb-6 hidden">
+            <h2 class="text-lg font-bold mb-3 text-green-400">🎁 我的兑换码</h2>
+            <div id="myCodesList" class="space-y-2"></div>
         </div>
 
         <!-- 分享功能 -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <div class="flex gap-2">
-                <button
-                    onclick="generateShareLink()"
-                    class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded"
-                >
+                <button onclick="generateShareLink()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded">
                     📤 生成分享链接
                 </button>
-                <button
-                    onclick="clearAll()"
-                    class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded"
-                >
+                <button onclick="clearAll()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded">
                     清空
                 </button>
             </div>
@@ -46,6 +97,12 @@
                 <p class="text-sm text-gray-400 mb-2">链接已复制！发给朋友即可：</p>
                 <div class="bg-gray-700 rounded p-2 text-xs text-gray-300 break-all" id="shareLink"></div>
             </div>
+        </div>
+
+        <!-- 付款管理（车头视角） -->
+        <div id="paymentManageSection" class="bg-gray-800 rounded-lg p-4 mb-6 hidden">
+            <h2 class="text-lg font-bold mb-3">📋 付款管理</h2>
+            <div id="paymentStatusList" class="space-y-2"></div>
         </div>
 
         <!-- 价格总览 -->
@@ -65,7 +122,6 @@
             </div>
             <div id="nextTierInfo" class="mt-3 text-sm text-gray-400 bg-gray-700 rounded p-2 hidden"></div>
             
-            <!-- 每人应付 -->
             <div id="perPersonSection" class="mt-4 pt-4 border-t border-gray-700 hidden">
                 <h3 class="text-sm text-gray-400 mb-2">每人应付（按比例分摊优惠）：</h3>
                 <div id="perPersonList" class="space-y-1"></div>
@@ -76,12 +132,6 @@
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <h3 class="text-sm text-gray-400 mb-2">优惠梯度：</h3>
             <div id="tierBadges" class="flex flex-wrap gap-2"></div>
-        </div>
-
-        <!-- 我的兑换码（乘客视角） -->
-        <div id="myCodesSection" class="bg-green-900 rounded-lg p-4 mb-6 hidden">
-            <h2 class="text-lg font-bold mb-3 text-green-400">🎁 我的兑换码</h2>
-            <div id="myCodesList" class="space-y-2"></div>
         </div>
 
         <!-- 商品列表 -->
@@ -96,41 +146,20 @@
         <div class="bg-gray-800 rounded-lg p-4">
             <h2 class="text-lg font-bold mb-3">添加商品</h2>
             <div class="space-y-3">
-                <input
-                    type="text"
-                    id="userName"
-                    placeholder="你的昵称"
-                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
-                >
-                <input
-                    type="text"
-                    id="itemName"
-                    placeholder="商品名称"
-                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
-                >
-                <input
-                    type="number"
-                    id="itemPrice"
-                    placeholder="价格"
-                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
-                >
-                <button
-                    onclick="addItem()"
-                    class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded"
-                >
+                <input type="text" id="userName" placeholder="你的昵称" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
+                <input type="text" id="itemName" placeholder="商品名称" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
+                <input type="number" id="itemPrice" placeholder="价格" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
+                <button onclick="addItem()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded">
                     ➕ 添加到列表
                 </button>
             </div>
         </div>
 
-        <!-- 页脚 -->
-        <p class="text-center text-gray-600 text-sm mt-6">
-            数据保存在浏览器中，生成链接可分享给朋友
-        </p>
+        <p class="text-center text-gray-600 text-sm mt-6">数据保存在浏览器中，生成链接可分享给朋友</p>
     </div>
 
     <!-- 提示弹窗 -->
-    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow-lg hidden transition-opacity"></div>
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow-lg hidden"></div>
 
     <!-- 兑换码输入弹窗 -->
     <div id="codeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
@@ -140,28 +169,20 @@
                 商品：<span id="modalItemName" class="text-white"></span><br>
                 所属：<span id="modalItemOwner" class="text-amber-400"></span>
             </p>
-            <input
-                type="text"
-                id="codeInput"
-                placeholder="粘贴兑换码"
-                class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 mb-4"
-            >
+            <input type="text" id="codeInput" placeholder="粘贴兑换码" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 mb-4">
             <div class="flex gap-2">
-                <button onclick="saveCode()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded">
-                    保存
-                </button>
-                <button onclick="closeCodeModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 rounded">
-                    取消
-                </button>
+                <button onclick="saveCode()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded">保存</button>
+                <button onclick="closeCodeModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 rounded">取消</button>
             </div>
         </div>
     </div>
 
     <script>
-        // 数据
         let items = [];
         let currentIdentity = null;
         let editingItemId = null;
+        let paymentInfo = { driverName: '', method: 'alipay', account: '', note: '' };
+        let paymentStatus = {}; // { "昵称": true/false }
         
         const discountTiers = [
             { threshold: 50, discount: 10 },
@@ -170,94 +191,50 @@
             { threshold: 1000, discount: 300 },
         ];
 
-        // 页面加载时
         window.onload = function() {
-            // 优先从URL读取数据
             const urlData = getDataFromURL();
-            if (urlData && urlData.length > 0) {
-                items = urlData;
-                showToast('已加载分享的商品列表！');
+            if (urlData) {
+                if (urlData.items) items = urlData.items;
+                if (urlData.paymentInfo) paymentInfo = urlData.paymentInfo;
+                if (urlData.paymentStatus) paymentStatus = urlData.paymentStatus;
+                showToast('已加载分享的拼单数据！');
             } else {
-                // 否则从本地存储读取
-                const saved = localStorage.getItem('ff14_items');
+                const saved = localStorage.getItem('ff14_data');
                 if (saved) {
                     try {
-                        items = JSON.parse(saved);
-                    } catch (e) {
-                        items = [];
-                    }
+                        const data = JSON.parse(saved);
+                        items = data.items || [];
+                        paymentInfo = data.paymentInfo || paymentInfo;
+                        paymentStatus = data.paymentStatus || {};
+                    } catch (e) {}
                 }
             }
             
-            // 读取保存的昵称
             const savedName = localStorage.getItem('ff14_username');
-            if (savedName) {
-                document.getElementById('userName').value = savedName;
-            }
+            if (savedName) document.getElementById('userName').value = savedName;
             
             updateIdentityButtons();
             updateDisplay();
         };
 
-        // 从URL获取数据
         function getDataFromURL() {
             const params = new URLSearchParams(window.location.search);
             const data = params.get('data');
             if (data) {
                 try {
                     return JSON.parse(decodeURIComponent(atob(data)));
-                } catch (e) {
-                    return null;
-                }
+                } catch (e) { return null; }
             }
             return null;
         }
 
-        // 更新身份按钮
-        function updateIdentityButtons() {
-            const container = document.getElementById('identityButtons');
-            const owners = [...new Set(items.map(item => item.owner))];
-            
-            let html = `
-                <button onclick="setIdentity('车头')" class="identity-btn bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-sm">
-                    我是车头
-                </button>
-            `;
-            
-            owners.forEach(owner => {
-                html += `
-                    <button onclick="setIdentity('${escapeHtml(owner)}')" class="identity-btn bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">
-                        ${escapeHtml(owner)}
-                    </button>
-                `;
-            });
-            
-            container.innerHTML = html;
+        function getAllData() {
+            return { items, paymentInfo, paymentStatus };
         }
 
-        // 设置身份
-        function setIdentity(identity) {
-            currentIdentity = identity;
-            document.getElementById('currentIdentity').textContent = identity;
-            
-            // 如果是乘客，自动填入昵称
-            if (identity !== '车头') {
-                document.getElementById('userName').value = identity;
-                localStorage.setItem('ff14_username', identity);
-            }
-            
-            updateDisplay();
-            showToast(`已切换为：${identity}`);
-        }
-
-        // 生成分享链接
         function generateShareLink() {
-            if (items.length === 0) {
-                alert('请先添加商品！');
-                return;
-            }
-            
-            const data = btoa(encodeURIComponent(JSON.stringify(items)));
+            if (items.length === 0) { alert('请先添加商品！'); return; }
+            const data = btoa(encodeURIComponent(JSON.stringify(getAllData())));
             const baseUrl = window.location.href.split('?')[0];
             const shareUrl = baseUrl + '?data=' + data;
             
@@ -268,63 +245,82 @@
             }).catch(() => {
                 document.getElementById('shareLink').textContent = shareUrl;
                 document.getElementById('shareResult').classList.remove('hidden');
-                alert('请手动复制下方链接');
             });
         }
 
-        // 显示提示
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.classList.remove('hidden');
-            setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 2000);
+            setTimeout(() => toast.classList.add('hidden'), 2000);
         }
 
-        // 保存到本地
         function saveToLocal() {
-            localStorage.setItem('ff14_items', JSON.stringify(items));
+            localStorage.setItem('ff14_data', JSON.stringify(getAllData()));
         }
 
-        // 计算总价
-        function getTotalPrice() {
-            return items.reduce((sum, item) => sum + item.price, 0);
+        function updateIdentityButtons() {
+            const container = document.getElementById('identityButtons');
+            const owners = [...new Set(items.map(item => item.owner))];
+            
+            let html = `<button onclick="setIdentity('车头')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-sm">我是车头</button>`;
+            owners.forEach(owner => {
+                html += `<button onclick="setIdentity('${escapeHtml(owner)}')" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm">${escapeHtml(owner)}</button>`;
+            });
+            container.innerHTML = html;
         }
 
-        // 计算当前优惠
+        function setIdentity(identity) {
+            currentIdentity = identity;
+            document.getElementById('currentIdentity').textContent = identity;
+            if (identity !== '车头') {
+                document.getElementById('userName').value = identity;
+                localStorage.setItem('ff14_username', identity);
+            }
+            updateDisplay();
+            showToast(`已切换为：${identity}`);
+        }
+
+        function savePaymentInfo() {
+            paymentInfo.driverName = document.getElementById('driverName').value.trim();
+            paymentInfo.method = document.getElementById('paymentMethod').value;
+            paymentInfo.account = document.getElementById('paymentAccount').value.trim();
+            paymentInfo.note = document.getElementById('paymentNote').value.trim();
+            saveToLocal();
+            showToast('收款信息已保存！');
+            document.getElementById('shareResult').classList.add('hidden');
+        }
+
+        function copyAccount() {
+            navigator.clipboard.writeText(paymentInfo.account).then(() => showToast('账号已复制！'));
+        }
+
+        function togglePaymentStatus(owner) {
+            paymentStatus[owner] = !paymentStatus[owner];
+            saveToLocal();
+            updateDisplay();
+            document.getElementById('shareResult').classList.add('hidden');
+        }
+
+        function getTotalPrice() { return items.reduce((sum, item) => sum + item.price, 0); }
+
         function getCurrentDiscount(total) {
             let discount = 0;
-            for (const tier of discountTiers) {
-                if (total >= tier.threshold) {
-                    discount = tier.discount;
-                }
-            }
+            for (const tier of discountTiers) { if (total >= tier.threshold) discount = tier.discount; }
             return discount;
         }
 
-        // 计算下一档
         function getNextTierInfo(total) {
             for (const tier of discountTiers) {
-                if (total < tier.threshold) {
-                    return {
-                        needed: tier.threshold - total,
-                        threshold: tier.threshold,
-                        discount: tier.discount,
-                    };
-                }
+                if (total < tier.threshold) return { needed: tier.threshold - total, threshold: tier.threshold, discount: tier.discount };
             }
             return null;
         }
 
-        // 计算每人应付
         function calculatePerPerson(total, discount) {
             const perPerson = {};
-            
             items.forEach(item => {
-                if (!perPerson[item.owner]) {
-                    perPerson[item.owner] = { original: 0, items: [] };
-                }
+                if (!perPerson[item.owner]) perPerson[item.owner] = { original: 0, items: [] };
                 perPerson[item.owner].original += item.price;
                 perPerson[item.owner].items.push(item.name);
             });
@@ -334,58 +330,30 @@
                 const ratio = perPerson[owner].original / total;
                 const personDiscount = Math.round(discount * ratio * 100) / 100;
                 const finalPay = Math.round((perPerson[owner].original - personDiscount) * 100) / 100;
-                result.push({
-                    name: owner,
-                    original: perPerson[owner].original,
-                    discount: personDiscount,
-                    final: finalPay,
-                    items: perPerson[owner].items
-                });
+                result.push({ name: owner, original: perPerson[owner].original, discount: personDiscount, final: finalPay });
             }
-            
             return result;
         }
 
-        // 添加商品
         function addItem() {
             const userName = document.getElementById('userName').value.trim();
             const itemName = document.getElementById('itemName').value.trim();
             const itemPrice = parseFloat(document.getElementById('itemPrice').value);
 
-            if (!userName) {
-                alert('请输入你的昵称');
-                return;
-            }
-            if (!itemName) {
-                alert('请输入商品名称');
-                return;
-            }
-            if (!itemPrice || itemPrice <= 0) {
-                alert('请输入有效的价格');
-                return;
-            }
+            if (!userName) { alert('请输入你的昵称'); return; }
+            if (!itemName) { alert('请输入商品名称'); return; }
+            if (!itemPrice || itemPrice <= 0) { alert('请输入有效的价格'); return; }
 
-            items.push({
-                id: Date.now(),
-                name: itemName,
-                price: itemPrice,
-                owner: userName,
-                code: ''  // 兑换码字段
-            });
-
+            items.push({ id: Date.now(), name: itemName, price: itemPrice, owner: userName, code: '' });
             localStorage.setItem('ff14_username', userName);
-            
             document.getElementById('itemName').value = '';
             document.getElementById('itemPrice').value = '';
-
             saveToLocal();
             updateIdentityButtons();
             updateDisplay();
-            
             document.getElementById('shareResult').classList.add('hidden');
         }
 
-        // 删除商品
         function removeItem(id) {
             items = items.filter(item => item.id !== id);
             saveToLocal();
@@ -394,11 +362,9 @@
             document.getElementById('shareResult').classList.add('hidden');
         }
 
-        // 打开兑换码弹窗
         function openCodeModal(id) {
             const item = items.find(i => i.id === id);
             if (!item) return;
-            
             editingItemId = id;
             document.getElementById('modalItemName').textContent = item.name;
             document.getElementById('modalItemOwner').textContent = item.owner;
@@ -407,40 +373,28 @@
             document.getElementById('codeInput').focus();
         }
 
-        // 关闭弹窗
         function closeCodeModal() {
             document.getElementById('codeModal').classList.add('hidden');
             editingItemId = null;
         }
 
-        // 保存兑换码
         function saveCode() {
             const code = document.getElementById('codeInput').value.trim();
             const item = items.find(i => i.id === editingItemId);
-            if (item) {
-                item.code = code;
-                saveToLocal();
-                updateDisplay();
-                showToast('兑换码已保存！');
-            }
+            if (item) { item.code = code; saveToLocal(); updateDisplay(); showToast('兑换码已保存！'); }
             closeCodeModal();
             document.getElementById('shareResult').classList.add('hidden');
         }
 
-        // 复制兑换码
         function copyCode(code) {
-            navigator.clipboard.writeText(code).then(() => {
-                showToast('兑换码已复制！');
-            }).catch(() => {
-                alert('复制失败，请手动复制：' + code);
-            });
+            navigator.clipboard.writeText(code).then(() => showToast('兑换码已复制！'));
         }
 
-        // 清空所有
         function clearAll() {
             if (items.length === 0) return;
-            if (confirm('确定要清空所有商品吗？')) {
+            if (confirm('确定要清空所有数据吗？')) {
                 items = [];
+                paymentStatus = {};
                 saveToLocal();
                 updateIdentityButtons();
                 updateDisplay();
@@ -449,112 +403,114 @@
             }
         }
 
-        // 更新显示
         function updateDisplay() {
             const total = getTotalPrice();
             const discount = getCurrentDiscount(total);
             const nextTier = getNextTierInfo(total);
             const isDriver = currentIdentity === '车头';
+            const perPersonData = items.length > 0 ? calculatePerPerson(total, discount) : [];
 
-            // 更新价格显示
+            // 价格显示
             document.getElementById('totalPrice').textContent = '¥' + total;
             document.getElementById('currentDiscount').textContent = '-¥' + discount;
             document.getElementById('finalPrice').textContent = '¥' + (total - discount);
             document.getElementById('itemCount').textContent = items.length > 0 ? `(${items.length}件)` : '';
 
-            // 更新下一档提示
+            // 下一档提示
             const nextTierEl = document.getElementById('nextTierInfo');
             if (nextTier) {
                 nextTierEl.innerHTML = `再加 <span class="text-amber-300">¥${nextTier.needed}</span> 可达到满${nextTier.threshold}减${nextTier.discount}`;
                 nextTierEl.classList.remove('hidden');
+            } else if (total >= 1000) {
+                nextTierEl.innerHTML = `🎉 已达到最高优惠档位！`;
+                nextTierEl.classList.remove('hidden');
             } else {
-                if (total >= 1000) {
-                    nextTierEl.innerHTML = `🎉 已达到最高优惠档位！`;
-                    nextTierEl.classList.remove('hidden');
+                nextTierEl.classList.add('hidden');
+            }
+
+            // 优惠梯度
+            document.getElementById('tierBadges').innerHTML = discountTiers.map(tier => 
+                `<span class="text-xs px-2 py-1 rounded ${total >= tier.threshold ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'}">满${tier.threshold}减${tier.discount}</span>`
+            ).join('');
+
+            // 收款信息区域
+            const paymentInfoSection = document.getElementById('paymentInfoSection');
+            const paymentEditMode = document.getElementById('paymentEditMode');
+            const paymentViewMode = document.getElementById('paymentViewMode');
+            
+            if (currentIdentity) {
+                paymentInfoSection.classList.remove('hidden');
+                if (isDriver) {
+                    paymentEditMode.classList.remove('hidden');
+                    paymentViewMode.classList.add('hidden');
+                    document.getElementById('driverName').value = paymentInfo.driverName;
+                    document.getElementById('paymentMethod').value = paymentInfo.method;
+                    document.getElementById('paymentAccount').value = paymentInfo.account;
+                    document.getElementById('paymentNote').value = paymentInfo.note;
                 } else {
-                    nextTierEl.classList.add('hidden');
-                }
-            }
-
-            // 更新优惠梯度标签
-            document.getElementById('tierBadges').innerHTML = discountTiers.map(tier => `
-                <span class="text-xs px-2 py-1 rounded ${total >= tier.threshold ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'}">
-                    满${tier.threshold}减${tier.discount}
-                </span>
-            `).join('');
-
-            // 更新商品列表（车头视角可以填兑换码）
-            const itemListEl = document.getElementById('itemList');
-            if (items.length === 0) {
-                itemListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无商品，添加第一件吧！</p>';
-            } else {
-                itemListEl.innerHTML = items.map(item => {
-                    let codeSection = '';
-                    if (isDriver) {
-                        // 车头可以填写/编辑兑换码
-                        if (item.code) {
-                            codeSection = `
-                                <div class="mt-2 flex items-center gap-2">
-                                    <span class="text-xs text-green-400">✓ 已填码</span>
-                                    <button onclick="openCodeModal(${item.id})" class="text-xs text-blue-400 hover:text-blue-300">编辑</button>
-                                </div>
-                            `;
-                        } else {
-                            codeSection = `
-                                <button onclick="openCodeModal(${item.id})" class="mt-2 text-xs text-yellow-400 hover:text-yellow-300">
-                                    + 填写兑换码
-                                </button>
-                            `;
-                        }
+                    paymentEditMode.classList.add('hidden');
+                    if (paymentInfo.account) {
+                        paymentViewMode.classList.remove('hidden');
+                        document.getElementById('viewDriverName').textContent = paymentInfo.driverName || '未设置';
+                        const methodText = { alipay: '支付宝', wechat: '微信', both: '支付宝/微信' };
+                        document.getElementById('viewPaymentMethod').textContent = methodText[paymentInfo.method];
+                        document.getElementById('viewPaymentAccount').textContent = paymentInfo.account;
+                        document.getElementById('viewPaymentNote').textContent = paymentInfo.note || '';
+                    } else {
+                        paymentViewMode.classList.add('hidden');
                     }
-                    
-                    return `
-                        <div class="bg-gray-700 rounded p-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium">${escapeHtml(item.name)}</div>
-                                    <div class="text-sm text-gray-400">${escapeHtml(item.owner)}</div>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <span class="text-amber-400">¥${item.price}</span>
-                                    <button onclick="removeItem(${item.id})" class="text-red-400 hover:text-red-300 text-sm">
-                                        删除
-                                    </button>
-                                </div>
-                            </div>
-                            ${codeSection}
-                        </div>
-                    `;
-                }).join('');
+                }
+            } else {
+                paymentInfoSection.classList.add('hidden');
             }
 
-            // 更新每人应付
-            const perPersonSection = document.getElementById('perPersonSection');
-            const perPersonList = document.getElementById('perPersonList');
-            if (items.length > 0 && discount > 0) {
-                const perPerson = calculatePerPerson(total, discount);
-                perPersonSection.classList.remove('hidden');
-                perPersonList.innerHTML = perPerson.map(p => `
-                    <div class="flex justify-between text-sm bg-gray-700 rounded px-3 py-2">
-                        <span>${escapeHtml(p.name)}</span>
-                        <span>
-                            <span class="text-gray-400 line-through mr-2">¥${p.original}</span>
-                            <span class="text-amber-400 font-bold">¥${p.final}</span>
-                        </span>
-                    </div>
-                `).join('');
+            // 付款管理（车头视角）
+            const paymentManageSection = document.getElementById('paymentManageSection');
+            if (isDriver && items.length > 0) {
+                paymentManageSection.classList.remove('hidden');
+                const paidCount = perPersonData.filter(p => paymentStatus[p.name]).length;
+                document.getElementById('paymentStatusList').innerHTML = 
+                    `<p class="text-sm text-gray-400 mb-2">已付款：${paidCount}/${perPersonData.length} 人</p>` +
+                    perPersonData.map(p => `
+                        <div class="flex items-center justify-between bg-gray-700 rounded p-3">
+                            <div>
+                                <span class="font-medium">${escapeHtml(p.name)}</span>
+                                <span class="text-amber-400 ml-2">¥${p.final}</span>
+                            </div>
+                            <button onclick="togglePaymentStatus('${escapeHtml(p.name)}')" class="px-3 py-1 rounded text-sm ${paymentStatus[p.name] ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}">
+                                ${paymentStatus[p.name] ? '✓ 已付款' : '未付款'}
+                            </button>
+                        </div>
+                    `).join('');
             } else {
-                perPersonSection.classList.add('hidden');
+                paymentManageSection.classList.add('hidden');
+            }
+
+            // 我的付款状态（乘客视角）
+            const myPaymentSection = document.getElementById('myPaymentSection');
+            if (currentIdentity && !isDriver) {
+                const myData = perPersonData.find(p => p.name === currentIdentity);
+                if (myData) {
+                    myPaymentSection.classList.remove('hidden');
+                    document.getElementById('myPaymentAmount').textContent = '¥' + myData.final;
+                    const isPaid = paymentStatus[currentIdentity];
+                    document.getElementById('myPaymentStatus').innerHTML = isPaid 
+                        ? '<span class="text-green-400">✓ 车头已确认收款</span>'
+                        : '<span class="text-yellow-400">⏳ 等待车头确认...</span>';
+                    document.getElementById('myPaymentStatus').className = `text-center py-2 rounded ${isPaid ? 'bg-green-800' : 'bg-yellow-800'}`;
+                } else {
+                    myPaymentSection.classList.add('hidden');
+                }
+            } else {
+                myPaymentSection.classList.add('hidden');
             }
 
             // 我的兑换码（乘客视角）
             const myCodesSection = document.getElementById('myCodesSection');
             const myCodesList = document.getElementById('myCodesList');
-            
-            if (currentIdentity && currentIdentity !== '车头') {
+            if (currentIdentity && !isDriver) {
                 const myItems = items.filter(item => item.owner === currentIdentity);
                 const myItemsWithCode = myItems.filter(item => item.code);
-                
                 if (myItemsWithCode.length > 0) {
                     myCodesSection.classList.remove('hidden');
                     myCodesList.innerHTML = myItemsWithCode.map(item => `
@@ -562,9 +518,7 @@
                             <div class="text-sm text-gray-400 mb-1">${escapeHtml(item.name)}</div>
                             <div class="flex items-center justify-between">
                                 <code class="text-green-400 font-mono text-sm">${escapeHtml(item.code)}</code>
-                                <button onclick="copyCode('${escapeHtml(item.code)}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
-                                    复制
-                                </button>
+                                <button onclick="copyCode('${escapeHtml(item.code)}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">复制</button>
                             </div>
                         </div>
                     `).join('');
@@ -577,9 +531,56 @@
             } else {
                 myCodesSection.classList.add('hidden');
             }
+
+            // 每人应付
+            const perPersonSection = document.getElementById('perPersonSection');
+            const perPersonList = document.getElementById('perPersonList');
+            if (items.length > 0 && discount > 0) {
+                perPersonSection.classList.remove('hidden');
+                perPersonList.innerHTML = perPersonData.map(p => `
+                    <div class="flex justify-between text-sm bg-gray-700 rounded px-3 py-2">
+                        <span>${escapeHtml(p.name)} ${paymentStatus[p.name] ? '<span class="text-green-400">✓</span>' : ''}</span>
+                        <span>
+                            <span class="text-gray-400 line-through mr-2">¥${p.original}</span>
+                            <span class="text-amber-400 font-bold">¥${p.final}</span>
+                        </span>
+                    </div>
+                `).join('');
+            } else {
+                perPersonSection.classList.add('hidden');
+            }
+
+            // 商品列表
+            const itemListEl = document.getElementById('itemList');
+            if (items.length === 0) {
+                itemListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无商品，添加第一件吧！</p>';
+            } else {
+                itemListEl.innerHTML = items.map(item => {
+                    let codeSection = '';
+                    if (isDriver) {
+                        codeSection = item.code
+                            ? `<div class="mt-2 flex items-center gap-2"><span class="text-xs text-green-400">✓ 已填码</span><button onclick="openCodeModal(${item.id})" class="text-xs text-blue-400 hover:text-blue-300">编辑</button></div>`
+                            : `<button onclick="openCodeModal(${item.id})" class="mt-2 text-xs text-yellow-400 hover:text-yellow-300">+ 填写兑换码</button>`;
+                    }
+                    return `
+                        <div class="bg-gray-700 rounded p-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium">${escapeHtml(item.name)}</div>
+                                    <div class="text-sm text-gray-400">${escapeHtml(item.owner)}</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-amber-400">¥${item.price}</span>
+                                    <button onclick="removeItem(${item.id})" class="text-red-400 hover:text-red-300 text-sm">删除</button>
+                                </div>
+                            </div>
+                            ${codeSection}
+                        </div>
+                    `;
+                }).join('');
+            }
         }
 
-        // 防止XSS
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
