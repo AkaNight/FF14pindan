@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF14 商城拼单工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #111827; }
+    </style>
+</head>
+<body class="min-h-screen text-gray-100 p-4">
+    <div class="max-w-lg mx-auto">
+        <h1 class="text-2xl font-bold text-center mb-6 text-amber-400">
+            🛒 FF14 商城拼单工具
+        </h1>
+
+        <!-- 分享功能 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="flex gap-2">
+                <button
+                    onclick="generateShareLink()"
+                    class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded"
+                >
+                    📤 生成分享链接
+                </button>
+                <button
+                    onclick="clearAll()"
+                    class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded"
+                >
+                    清空
+                </button>
+            </div>
+            <div id="shareResult" class="mt-3 hidden">
+                <p class="text-sm text-gray-400 mb-2">链接已复制！发给朋友即可：</p>
+                <div class="bg-gray-700 rounded p-2 text-xs text-gray-300 break-all" id="shareLink"></div>
+            </div>
+        </div>
+
+        <!-- 价格总览 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="flex justify-between mb-2">
+                <span>商品总价：</span>
+                <span id="totalPrice" class="text-white font-bold">¥0</span>
+            </div>
+            <div class="flex justify-between mb-2">
+                <span>当前优惠：</span>
+                <span id="currentDiscount" class="text-green-400 font-bold">-¥0</span>
+            </div>
+            <div class="border-t border-gray-700 my-2"></div>
+            <div class="flex justify-between text-lg">
+                <span>实付金额：</span>
+                <span id="finalPrice" class="text-amber-400 font-bold">¥0</span>
+            </div>
+            <div id="nextTierInfo" class="mt-3 text-sm text-gray-400 bg-gray-700 rounded p-2 hidden"></div>
+            
+            <!-- 每人应付 -->
+            <div id="perPersonSection" class="mt-4 pt-4 border-t border-gray-700 hidden">
+                <h3 class="text-sm text-gray-400 mb-2">每人应付（按比例分摊优惠）：</h3>
+                <div id="perPersonList" class="space-y-1"></div>
+            </div>
+        </div>
+
+        <!-- 优惠梯度参考 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 class="text-sm text-gray-400 mb-2">优惠梯度：</h3>
+            <div id="tierBadges" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- 商品列表 -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="text-lg font-bold mb-3">商品列表 <span id="itemCount" class="text-sm text-gray-400"></span></h2>
+            <div id="itemList" class="space-y-2">
+                <p class="text-gray-500 text-center py-4">暂无商品</p>
+            </div>
+        </div>
+
+        <!-- 添加商品 -->
+        <div class="bg-gray-800 rounded-lg p-4">
+            <h2 class="text-lg font-bold mb-3">添加商品</h2>
+            <div class="space-y-3">
+                <input
+                    type="text"
+                    id="userName"
+                    placeholder="你的昵称"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                >
+                <input
+                    type="text"
+                    id="itemName"
+                    placeholder="商品名称"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                >
+                <input
+                    type="number"
+                    id="itemPrice"
+                    placeholder="价格"
+                    class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500"
+                >
+                <button
+                    onclick="addItem()"
+                    class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded"
+                >
+                    ➕ 添加到列表
+                </button>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <p class="text-center text-gray-600 text-sm mt-6">
+            数据保存在浏览器中，生成链接可分享给朋友
+        </p>
+    </div>
+
+    <!-- 提示弹窗 -->
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow-lg hidden">
+        已复制到剪贴板！
+    </div>
+
+    <script>
+        // 数据
+        let items = [];
+        const discountTiers = [
+            { threshold: 50, discount: 10 },
+            { threshold: 200, discount: 45 },
+            { threshold: 400, discount: 100 },
+            { threshold: 1000, discount: 300 },
+        ];
+
+        // 页面加载时
+        window.onload = function() {
+            // 优先从URL读取数据
+            const urlData = getDataFromURL();
+            if (urlData && urlData.length > 0) {
+                items = urlData;
+                showToast('已加载分享的商品列表！');
+            } else {
+                // 否则从本地存储读取
+                const saved = localStorage.getItem('ff14_items');
+                if (saved) {
+                    try {
+                        items = JSON.parse(saved);
+                    } catch (e) {
+                        items = [];
+                    }
+                }
+            }
+            
+            // 读取保存的昵称
+            const savedName = localStorage.getItem('ff14_username');
+            if (savedName) {
+                document.getElementById('userName').value = savedName;
+            }
+            
+            updateDisplay();
+        };
+
+        // 从URL获取数据
+        function getDataFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const data = params.get('data');
+            if (data) {
+                try {
+                    return JSON.parse(decodeURIComponent(atob(data)));
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        // 生成分享链接
+        function generateShareLink() {
+            if (items.length === 0) {
+                alert('请先添加商品！');
+                return;
+            }
+            
+            const data = btoa(encodeURIComponent(JSON.stringify(items)));
+            const baseUrl = window.location.href.split('?')[0];
+            const shareUrl = baseUrl + '?data=' + data;
+            
+            // 复制到剪贴板
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                document.getElementById('shareLink').textContent = shareUrl;
+                document.getElementById('shareResult').classList.remove('hidden');
+                showToast('链接已复制到剪贴板！');
+            }).catch(() => {
+                // 降级方案
+                document.getElementById('shareLink').textContent = shareUrl;
+                document.getElementById('shareResult').classList.remove('hidden');
+                alert('请手动复制下方链接');
+            });
+        }
+
+        // 显示提示
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2000);
+        }
+
+        // 保存到本地
+        function saveToLocal() {
+            localStorage.setItem('ff14_items', JSON.stringify(items));
+        }
+
+        // 计算总价
+        function getTotalPrice() {
+            return items.reduce((sum, item) => sum + item.price, 0);
+        }
+
+        // 计算当前优惠
+        function getCurrentDiscount(total) {
+            let discount = 0;
+            for (const tier of discountTiers) {
+                if (total >= tier.threshold) {
+                    discount = tier.discount;
+                }
+            }
+            return discount;
+        }
+
+        // 计算下一档
+        function getNextTierInfo(total) {
+            for (const tier of discountTiers) {
+                if (total < tier.threshold) {
+                    return {
+                        needed: tier.threshold - total,
+                        threshold: tier.threshold,
+                        discount: tier.discount,
+                    };
+                }
+            }
+            return null;
+        }
+
+        // 计算每人应付
+        function calculatePerPerson(total, discount) {
+            const perPerson = {};
+            
+            // 先统计每人的原价总额
+            items.forEach(item => {
+                if (!perPerson[item.owner]) {
+                    perPerson[item.owner] = { original: 0, items: [] };
+                }
+                perPerson[item.owner].original += item.price;
+                perPerson[item.owner].items.push(item.name);
+            });
+            
+            // 按比例分摊优惠
+            const result = [];
+            for (const owner in perPerson) {
+                const ratio = perPerson[owner].original / total;
+                const personDiscount = Math.round(discount * ratio * 100) / 100;
+                const finalPay = Math.round((perPerson[owner].original - personDiscount) * 100) / 100;
+                result.push({
+                    name: owner,
+                    original: perPerson[owner].original,
+                    discount: personDiscount,
+                    final: finalPay,
+                    items: perPerson[owner].items
+                });
+            }
+            
+            return result;
+        }
+
+        // 添加商品
+        function addItem() {
+            const userName = document.getElementById('userName').value.trim();
+            const itemName = document.getElementById('itemName').value.trim();
+            const itemPrice = parseFloat(document.getElementById('itemPrice').value);
+
+            if (!userName) {
+                alert('请输入你的昵称');
+                return;
+            }
+            if (!itemName) {
+                alert('请输入商品名称');
+                return;
+            }
+            if (!itemPrice || itemPrice <= 0) {
+                alert('请输入有效的价格');
+                return;
+            }
+
+            items.push({
+                id: Date.now(),
+                name: itemName,
+                price: itemPrice,
+                owner: userName
+            });
+
+            // 保存昵称
+            localStorage.setItem('ff14_username', userName);
+            
+            // 清空输入（保留昵称）
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemPrice').value = '';
+
+            saveToLocal();
+            updateDisplay();
+            
+            // 隐藏分享结果（因为数据变了）
+            document.getElementById('shareResult').classList.add('hidden');
+        }
+
+        // 删除商品
+        function removeItem(id) {
+            items = items.filter(item => item.id !== id);
+            saveToLocal();
+            updateDisplay();
+            document.getElementById('shareResult').classList.add('hidden');
+        }
+
+        // 清空所有
+        function clearAll() {
+            if (items.length === 0) return;
+            if (confirm('确定要清空所有商品吗？')) {
+                items = [];
+                saveToLocal();
+                updateDisplay();
+                document.getElementById('shareResult').classList.add('hidden');
+                // 清除URL参数
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            const total = getTotalPrice();
+            const discount = getCurrentDiscount(total);
+            const nextTier = getNextTierInfo(total);
+
+            // 更新价格显示
+            document.getElementById('totalPrice').textContent = '¥' + total;
+            document.getElementById('currentDiscount').textContent = '-¥' + discount;
+            document.getElementById('finalPrice').textContent = '¥' + (total - discount);
+            document.getElementById('itemCount').textContent = items.length > 0 ? `(${items.length}件)` : '';
+
+            // 更新下一档提示
+            const nextTierEl = document.getElementById('nextTierInfo');
+            if (nextTier) {
+                nextTierEl.innerHTML = `再加 <span class="text-amber-300">¥${nextTier.needed}</span> 可达到满${nextTier.threshold}减${nextTier.discount}`;
+                nextTierEl.classList.remove('hidden');
+            } else {
+                if (total >= 1000) {
+                    nextTierEl.innerHTML = `🎉 已达到最高优惠档位！`;
+                    nextTierEl.classList.remove('hidden');
+                } else {
+                    nextTierEl.classList.add('hidden');
+                }
+            }
+
+            // 更新优惠梯度标签
+            document.getElementById('tierBadges').innerHTML = discountTiers.map(tier => `
+                <span class="text-xs px-2 py-1 rounded ${total >= tier.threshold ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'}">
+                    满${tier.threshold}减${tier.discount}
+                </span>
+            `).join('');
+
+            // 更新商品列表
+            const itemListEl = document.getElementById('itemList');
+            if (items.length === 0) {
+                itemListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无商品，添加第一件吧！</p>';
+            } else {
+                itemListEl.innerHTML = items.map(item => `
+                    <div class="flex items-center justify-between bg-gray-700 rounded p-3">
+                        <div>
+                            <div class="font-medium">${escapeHtml(item.name)}</div>
+                            <div class="text-sm text-gray-400">${escapeHtml(item.owner)}</div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-amber-400">¥${item.price}</span>
+                            <button onclick="removeItem(${item.id})" class="text-red-400 hover:text-red-300 text-sm">
+                                删除
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // 更新每人应付
+            const perPersonSection = document.getElementById('perPersonSection');
+            const perPersonList = document.getElementById('perPersonList');
+            if (items.length > 0 && discount > 0) {
+                const perPerson = calculatePerPerson(total, discount);
+                perPersonSection.classList.remove('hidden');
+                perPersonList.innerHTML = perPerson.map(p => `
+                    <div class="flex justify-between text-sm bg-gray-700 rounded px-3 py-2">
+                        <span>${escapeHtml(p.name)}</span>
+                        <span>
+                            <span class="text-gray-400 line-through mr-2">¥${p.original}</span>
+                            <span class="text-amber-400 font-bold">¥${p.final}</span>
+                        </span>
+                    </div>
+                `).join('');
+            } else {
+                perPersonSection.classList.add('hidden');
+            }
+        }
+
+        // 防止XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
