@@ -454,13 +454,16 @@
 
     async function removeItem(id) {
         const item = items.find(i => i.id === id);
-        // 只有自己的商品或车头可以删除
         if (item.user_id !== currentUser.id && !isDriver()) {
             alert('只能删除自己的商品');
             return;
         }
         if (!confirm('确定删除？')) return;
-        await db.from('items').delete().eq('id', id);
+        const { error } = await db.from('items').delete().eq('id', id);
+        if (!error) {
+            await loadItems();
+            updateDisplay();
+        }
     }
 
     async function togglePaid(id, current) {
