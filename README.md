@@ -9,3 +9,7 @@ FF14商城拼单小工具
 
 
 网址：https://akanight.github.io/FF14pindan/
+
+
+
+安全防护：0

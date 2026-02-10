@@ -13,7 +13,26 @@
     <h1 class="text-2xl font-bold text-center mb-2 text-amber-400">🛒 FF14 商城拼单</h1>
     <p class="text-center text-gray-500 text-sm mb-6">数据实时同步</p>
 
-    <div id="homePage">
+    <!-- 登录页面 -->
+    <div id="authPage" class="hidden">
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-lg font-bold mb-4 text-center">🔐 登录 / 注册</h2>
+            <p class="text-gray-400 text-sm text-center mb-4">输入邮箱，我们会发送登录链接给你</p>
+            <input type="email" id="authEmail" placeholder="你的邮箱" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 mb-3">
+            <button id="sendMagicLinkBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded">发送登录链接</button>
+            <div id="authMessage" class="mt-4 text-center text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- 用户状态栏 -->
+    <div id="userBar" class="bg-gray-800 rounded-lg p-3 mb-4 hidden">
+        <div class="flex justify-between items-center">
+            <span class="text-sm text-gray-400">已登录：<span id="userEmail" class="text-amber-400"></span></span>
+            <button id="logoutBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">退出</button>
+        </div>
+    </div>
+
+    <div id="homePage" class="hidden">
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
             <h2 class="text-lg font-bold mb-4">🚗 创建新车队</h2>
             <button id="createBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded">开一辆新车</button>
@@ -39,12 +58,6 @@
                 </div>
                 <button id="homeBtn" class="text-gray-400 hover:text-white text-sm">← 返回</button>
             </div>
-        </div>
-
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h3 class="text-sm text-gray-400 mb-2">你是谁？</h3>
-            <div class="flex gap-2 flex-wrap" id="identityButtons"></div>
-            <p class="text-xs text-gray-500 mt-2">当前身份：<span id="currentIdentity" class="text-amber-400">未选择</span></p>
         </div>
 
         <div id="paymentInfoSection" class="bg-gray-800 rounded-lg p-4 mb-6 hidden">
@@ -113,7 +126,6 @@
         <div class="bg-gray-800 rounded-lg p-4">
             <h2 class="text-lg font-bold mb-3">添加商品</h2>
             <div class="space-y-3">
-                <input type="text" id="userName" placeholder="你的昵称" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
                 <input type="text" id="itemName" placeholder="商品名称" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
                 <input type="number" id="itemPrice" placeholder="价格" class="w-full bg-gray-700 rounded px-3 py-2 text-white placeholder-gray-500">
                 <button id="addItemBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded">➕ 添加到列表</button>
@@ -149,10 +161,10 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlb3loaWpkaXlrY21kd2RycWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODg3NTEsImV4cCI6MjA4NjI2NDc1MX0.wTeG9XQMv3ui5D1fRjqXDSJDLoWwBr0E730kIlEfN0w';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    let currentUser = null;
     let currentGroupId = null;
     let currentGroup = null;
     let items = [];
-    let currentIdentity = null;
     let editingItemId = null;
     let currentSubscription = null;
 
@@ -163,24 +175,34 @@
         {threshold: 1000, discount: 300}
     ];
 
-    // DOM Elements
     const $ = id => document.getElementById(id);
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        const params = new URLSearchParams(window.location.search);
-        const groupId = params.get('g');
-        if (groupId) {
-            loadGroup(groupId);
+    // 初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+        // 检查登录状态
+        const { data: { session } } = await db.auth.getSession();
+        if (session) {
+            currentUser = session.user;
+            showLoggedInState();
         } else {
-            showHomePage();
+            showAuthPage();
         }
-        loadRecentGroups();
-        
-        const savedName = localStorage.getItem('ff14_username');
-        if (savedName) $('userName').value = savedName;
+
+        // 监听认证状态变化（处理 Magic Link 回调）
+        db.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                currentUser = session.user;
+                showLoggedInState();
+                showToast('登录成功！');
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                showAuthPage();
+            }
+        });
 
         // Event Listeners
+        $('sendMagicLinkBtn').addEventListener('click', sendMagicLink);
+        $('logoutBtn').addEventListener('click', logout);
         $('createBtn').addEventListener('click', createGroup);
         $('joinBtn').addEventListener('click', joinGroup);
         $('homeBtn').addEventListener('click', goHome);
@@ -191,6 +213,73 @@
         $('saveCodeBtn').addEventListener('click', saveCode);
         $('closeCodeBtn').addEventListener('click', closeCodeModal);
     });
+
+    async function sendMagicLink() {
+        const email = $('authEmail').value.trim();
+        if (!email) {
+            showAuthMessage('请输入邮箱', 'error');
+            return;
+        }
+
+        $('sendMagicLinkBtn').disabled = true;
+        $('sendMagicLinkBtn').textContent = '发送中...';
+
+        const { error } = await db.auth.signInWithOtp({
+            email: email,
+            options: {
+                emailRedirectTo: window.location.origin + window.location.pathname + window.location.search
+            }
+        });
+
+        $('sendMagicLinkBtn').disabled = false;
+        $('sendMagicLinkBtn').textContent = '发送登录链接';
+
+        if (error) {
+            showAuthMessage('发送失败：' + error.message, 'error');
+        } else {
+            showAuthMessage('✓ 登录链接已发送到你的邮箱，请查收！', 'success');
+        }
+    }
+
+    function showAuthMessage(msg, type) {
+        const el = $('authMessage');
+        el.textContent = msg;
+        el.className = 'mt-4 text-center text-sm ' + (type === 'error' ? 'text-red-400' : 'text-green-400');
+        el.classList.remove('hidden');
+    }
+
+    async function logout() {
+        await db.auth.signOut();
+        currentUser = null;
+        currentGroupId = null;
+        currentGroup = null;
+        items = [];
+        showAuthPage();
+        showToast('已退出登录');
+    }
+
+    function showAuthPage() {
+        $('authPage').classList.remove('hidden');
+        $('userBar').classList.add('hidden');
+        $('homePage').classList.add('hidden');
+        $('groupPage').classList.add('hidden');
+    }
+
+    function showLoggedInState() {
+        $('authPage').classList.add('hidden');
+        $('userBar').classList.remove('hidden');
+        $('userEmail').textContent = currentUser.email;
+
+        // 检查 URL 参数
+        const params = new URLSearchParams(window.location.search);
+        const groupId = params.get('g');
+        if (groupId) {
+            loadGroup(groupId);
+        } else {
+            showHomePage();
+        }
+        loadRecentGroups();
+    }
 
     function showHomePage() {
         $('homePage').classList.remove('hidden');
@@ -215,7 +304,10 @@
     async function createGroup() {
         showLoading(true);
         const groupId = generateId();
-        const {error} = await db.from('groups').insert({id: groupId});
+        const {error} = await db.from('groups').insert({
+            id: groupId,
+            driver_id: currentUser.id
+        });
         if (error) {
             showLoading(false);
             alert('创建失败：' + error.message);
@@ -223,7 +315,7 @@
         }
         saveRecentGroup(groupId);
         await loadGroup(groupId);
-        showToast('车队创建成功！');
+        showToast('车队创建成功！你是车头');
     }
 
     async function joinGroup() {
@@ -241,6 +333,7 @@
         if (error || !group) {
             showLoading(false);
             alert('车队不存在');
+            showHomePage();
             return;
         }
         currentGroupId = groupId;
@@ -252,7 +345,6 @@
         $('homePage').classList.add('hidden');
         $('groupPage').classList.remove('hidden');
         $('groupIdDisplay').textContent = groupId;
-        updateIdentityButtons();
         updateDisplay();
         showLoading(false);
     }
@@ -262,7 +354,6 @@
         if (!error) items = data || [];
     }
 
-
     function subscribeToChanges() {
         if (currentSubscription) {
             db.removeChannel(currentSubscription);
@@ -270,7 +361,7 @@
 
         currentSubscription = db.channel('group-' + currentGroupId)
             .on('postgres_changes', {event: '*', schema: 'public', table: 'items', filter: 'group_id=eq.' + currentGroupId}, () => {
-                loadItems().then(() => { updateIdentityButtons(); updateDisplay(); });
+                loadItems().then(() => updateDisplay());
             })
             .on('postgres_changes', {event: '*', schema: 'public', table: 'groups', filter: 'id=eq.' + currentGroupId}, async () => {
                 const {data} = await db.from('groups').select('*').eq('id', currentGroupId).single();
@@ -313,26 +404,12 @@
         navigator.clipboard.writeText(currentGroup.payment_account).then(() => showToast('账号已复制！'));
     }
 
-    function setIdentity(identity) {
-        currentIdentity = identity;
-        $('currentIdentity').textContent = identity;
-        if (identity !== '车头') {
-            $('userName').value = identity;
-            localStorage.setItem('ff14_username', identity);
-        }
-        updateDisplay();
+    function isDriver() {
+        return currentGroup && currentGroup.driver_id === currentUser.id;
     }
 
-    function updateIdentityButtons() {
-        const owners = [...new Set(items.map(item => item.owner))];
-        let html = '<button class="identity-btn bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-sm" data-identity="车头">我是车头</button>';
-        owners.forEach(owner => {
-            html += '<button class="identity-btn bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm" data-identity="' + escapeHtml(owner) + '">' + escapeHtml(owner) + '</button>';
-        });
-        $('identityButtons').innerHTML = html;
-        document.querySelectorAll('.identity-btn').forEach(btn => {
-            btn.addEventListener('click', () => setIdentity(btn.dataset.identity));
-        });
+    function getMyItems() {
+        return items.filter(item => item.user_id === currentUser.id);
     }
 
     async function savePaymentInfo() {
@@ -356,10 +433,8 @@
     }
 
     async function addItem() {
-        const userName = $('userName').value.trim();
         const itemName = $('itemName').value.trim();
         const itemPrice = parseFloat($('itemPrice').value);
-        if (!userName) { alert('请输入昵称'); return; }
         if (!itemName) { alert('请输入商品名称'); return; }
         if (!itemPrice || itemPrice <= 0) { alert('请输入有效价格'); return; }
         $('addItemBtn').disabled = true;
@@ -367,31 +442,39 @@
             group_id: currentGroupId,
             name: itemName,
             price: itemPrice,
-            owner: userName
+            user_id: currentUser.id,
+            user_email: currentUser.email
         });
         $('addItemBtn').disabled = false;
         if (error) { alert('添加失败：' + error.message); return; }
-        localStorage.setItem('ff14_username', userName);
         $('itemName').value = '';
         $('itemPrice').value = '';
         showToast('已添加！');
     }
 
     async function removeItem(id) {
+        const item = items.find(i => i.id === id);
+        // 只有自己的商品或车头可以删除
+        if (item.user_id !== currentUser.id && !isDriver()) {
+            alert('只能删除自己的商品');
+            return;
+        }
         if (!confirm('确定删除？')) return;
         await db.from('items').delete().eq('id', id);
     }
 
     async function togglePaid(id, current) {
+        if (!isDriver()) return;
         await db.from('items').update({paid: !current}).eq('id', id);
     }
 
     function openCodeModal(id) {
+        if (!isDriver()) return;
         const item = items.find(i => i.id === id);
         if (!item) return;
         editingItemId = id;
         $('modalItemName').textContent = item.name;
-        $('modalItemOwner').textContent = item.owner;
+        $('modalItemOwner').textContent = item.user_email;
         $('codeInput').value = item.code || '';
         $('codeModal').classList.remove('hidden');
         $('codeInput').focus();
@@ -434,17 +517,25 @@
     function calculatePerPerson(total, discount) {
         const perPerson = {};
         items.forEach(item => {
-            if (!perPerson[item.owner]) perPerson[item.owner] = {original: 0, items: [], allPaid: true};
-            perPerson[item.owner].original += parseFloat(item.price);
-            perPerson[item.owner].items.push(item);
-            if (!item.paid) perPerson[item.owner].allPaid = false;
+            const key = item.user_id;
+            if (!perPerson[key]) perPerson[key] = {email: item.user_email, original: 0, items: [], allPaid: true};
+            perPerson[key].original += parseFloat(item.price);
+            perPerson[key].items.push(item);
+            if (!item.paid) perPerson[key].allPaid = false;
         });
         const result = [];
-        for (const owner in perPerson) {
-            const ratio = perPerson[owner].original / total;
+        for (const userId in perPerson) {
+            const ratio = perPerson[userId].original / total;
             const personDiscount = Math.round(discount * ratio * 100) / 100;
-            const finalPay = Math.round((perPerson[owner].original - personDiscount) * 100) / 100;
-            result.push({name: owner, original: perPerson[owner].original, final: finalPay, allPaid: perPerson[owner].allPaid, items: perPerson[owner].items});
+            const finalPay = Math.round((perPerson[userId].original - personDiscount) * 100) / 100;
+            result.push({
+                userId: userId,
+                email: perPerson[userId].email,
+                original: perPerson[userId].original,
+                final: finalPay,
+                allPaid: perPerson[userId].allPaid,
+                items: perPerson[userId].items
+            });
         }
         return result;
     }
@@ -453,8 +544,9 @@
         const total = getTotalPrice();
         const discount = getCurrentDiscount(total);
         const nextTier = getNextTierInfo(total);
-        const isDriver = currentIdentity === '车头';
+        const amDriver = isDriver();
         const perPersonData = items.length > 0 ? calculatePerPerson(total, discount) : [];
+        const myItems = getMyItems();
 
         $('totalPrice').textContent = '¥' + total;
         $('currentDiscount').textContent = '-¥' + discount;
@@ -477,40 +569,36 @@
         ).join('');
 
         // Payment info section
-        if (currentIdentity) {
-            $('paymentInfoSection').classList.remove('hidden');
-            if (isDriver) {
-                $('paymentEditMode').classList.remove('hidden');
-                $('paymentViewMode').classList.add('hidden');
-                $('driverName').value = currentGroup.driver_name || '';
-                $('paymentMethod').value = currentGroup.payment_method || 'alipay';
-                $('paymentAccount').value = currentGroup.payment_account || '';
-                $('paymentNote').value = currentGroup.payment_note || '';
-            } else {
-                $('paymentEditMode').classList.add('hidden');
-                if (currentGroup.payment_account) {
-                    $('paymentViewMode').classList.remove('hidden');
-                    $('viewDriverName').textContent = currentGroup.driver_name || '未设置';
-                    const methodText = {alipay: '支付宝', wechat: '微信', both: '支付宝/微信'};
-                    $('viewPaymentMethod').textContent = methodText[currentGroup.payment_method] || '支付宝';
-                    $('viewPaymentAccount').textContent = currentGroup.payment_account;
-                    $('viewPaymentNote').textContent = currentGroup.payment_note || '';
-                } else {
-                    $('paymentViewMode').classList.add('hidden');
-                }
-            }
+        $('paymentInfoSection').classList.remove('hidden');
+        if (amDriver) {
+            $('paymentEditMode').classList.remove('hidden');
+            $('paymentViewMode').classList.add('hidden');
+            $('driverName').value = currentGroup.driver_name || '';
+            $('paymentMethod').value = currentGroup.payment_method || 'alipay';
+            $('paymentAccount').value = currentGroup.payment_account || '';
+            $('paymentNote').value = currentGroup.payment_note || '';
         } else {
-            $('paymentInfoSection').classList.add('hidden');
+            $('paymentEditMode').classList.add('hidden');
+            if (currentGroup.payment_account) {
+                $('paymentViewMode').classList.remove('hidden');
+                $('viewDriverName').textContent = currentGroup.driver_name || '未设置';
+                const methodText = {alipay: '支付宝', wechat: '微信', both: '支付宝/微信'};
+                $('viewPaymentMethod').textContent = methodText[currentGroup.payment_method] || '支付宝';
+                $('viewPaymentAccount').textContent = currentGroup.payment_account;
+                $('viewPaymentNote').textContent = currentGroup.payment_note || '';
+            } else {
+                $('paymentViewMode').classList.add('hidden');
+            }
         }
 
-        // Payment management (driver)
-        if (isDriver && items.length > 0) {
+        // Payment management (driver only)
+        if (amDriver && items.length > 0) {
             $('paymentManageSection').classList.remove('hidden');
             const paidCount = perPersonData.filter(p => p.allPaid).length;
             let html = '<p class="text-sm text-gray-400 mb-2">已付款：' + paidCount + '/' + perPersonData.length + ' 人</p>';
             perPersonData.forEach(p => {
                 html += '<div class="bg-gray-700 rounded p-3 mb-2">';
-                html += '<div class="flex justify-between mb-2"><span>' + escapeHtml(p.name) + '</span><span class="text-amber-400">¥' + p.final + '</span></div>';
+                html += '<div class="flex justify-between mb-2"><span>' + escapeHtml(p.email) + '</span><span class="text-amber-400">¥' + p.final + '</span></div>';
                 html += '<div class="space-y-1">';
                 p.items.forEach(item => {
                     html += '<div class="flex justify-between text-sm bg-gray-800 rounded px-2 py-1">';
@@ -528,24 +616,21 @@
             $('paymentManageSection').classList.add('hidden');
         }
 
-        // My payment (passenger)
-        if (currentIdentity && !isDriver) {
-            const myData = perPersonData.find(p => p.name === currentIdentity);
+        // My payment (non-driver)
+        if (!amDriver && myItems.length > 0) {
+            const myData = perPersonData.find(p => p.userId === currentUser.id);
             if (myData) {
                 $('myPaymentSection').classList.remove('hidden');
                 $('myPaymentAmount').textContent = '¥' + myData.final;
                 $('myPaymentStatus').innerHTML = myData.allPaid ? '<span class="text-green-400">✓ 已确认收款</span>' : '<span class="text-yellow-400">⏳ 等待确认</span>';
                 $('myPaymentStatus').className = 'text-center py-2 rounded ' + (myData.allPaid ? 'bg-green-800' : 'bg-yellow-800');
-            } else {
-                $('myPaymentSection').classList.add('hidden');
             }
         } else {
             $('myPaymentSection').classList.add('hidden');
         }
 
-        // My codes (passenger)
-        if (currentIdentity && !isDriver) {
-            const myItems = items.filter(item => item.owner === currentIdentity);
+        // My codes (non-driver, only see own codes)
+        if (!amDriver && myItems.length > 0) {
             const myItemsWithCode = myItems.filter(item => item.code);
             if (myItemsWithCode.length > 0) {
                 $('myCodesSection').classList.remove('hidden');
@@ -562,11 +647,9 @@
                 document.querySelectorAll('.copy-code-btn').forEach(btn => {
                     btn.addEventListener('click', () => copyCode(btn.dataset.code));
                 });
-            } else if (myItems.length > 0) {
+            } else {
                 $('myCodesSection').classList.remove('hidden');
                 $('myCodesList').innerHTML = '<p class="text-gray-400 text-sm">等待车头填写兑换码...</p>';
-            } else {
-                $('myCodesSection').classList.add('hidden');
             }
         } else {
             $('myCodesSection').classList.add('hidden');
@@ -576,7 +659,7 @@
         if (items.length > 0 && discount > 0) {
             $('perPersonSection').classList.remove('hidden');
             $('perPersonList').innerHTML = perPersonData.map(p =>
-                '<div class="flex justify-between text-sm bg-gray-700 rounded px-3 py-2"><span>' + escapeHtml(p.name) + (p.allPaid ? ' <span class="text-green-400">✓</span>' : '') + '</span><span><span class="text-gray-400 line-through mr-2">¥' + p.original + '</span><span class="text-amber-400 font-bold">¥' + p.final + '</span></span></div>'
+                '<div class="flex justify-between text-sm bg-gray-700 rounded px-3 py-2"><span>' + escapeHtml(p.email) + (p.allPaid ? ' <span class="text-green-400">✓</span>' : '') + '</span><span><span class="text-gray-400 line-through mr-2">¥' + p.original + '</span><span class="text-amber-400 font-bold">¥' + p.final + '</span></span></div>'
             ).join('');
         } else {
             $('perPersonSection').classList.add('hidden');
@@ -588,14 +671,18 @@
         } else {
             let html = '';
             items.forEach(item => {
-                html += '<div class="bg-gray-700 rounded p-3">';
+                const canDelete = item.user_id === currentUser.id || amDriver;
+                const isMine = item.user_id === currentUser.id;
+                html += '<div class="bg-gray-700 rounded p-3 ' + (isMine ? 'border border-amber-600' : '') + '">';
                 html += '<div class="flex justify-between">';
-                html += '<div><div class="font-medium">' + escapeHtml(item.name) + (item.paid ? ' <span class="text-green-400 text-xs">✓已付</span>' : '') + '</div>';
-                html += '<div class="text-sm text-gray-400">' + escapeHtml(item.owner) + '</div></div>';
+                html += '<div><div class="font-medium">' + escapeHtml(item.name) + (item.paid ? ' <span class="text-green-400 text-xs">✓已付</span>' : '') + (isMine ? ' <span class="text-amber-400 text-xs">我的</span>' : '') + '</div>';
+                html += '<div class="text-sm text-gray-400">' + escapeHtml(item.user_email) + '</div></div>';
                 html += '<div class="flex items-center gap-3"><span class="text-amber-400">¥' + item.price + '</span>';
-                html += '<button class="remove-item-btn text-red-400 hover:text-red-300 text-sm" data-id="' + item.id + '">删除</button></div>';
-                html += '</div>';
-                if (isDriver) {
+                if (canDelete) {
+                    html += '<button class="remove-item-btn text-red-400 hover:text-red-300 text-sm" data-id="' + item.id + '">删除</button>';
+                }
+                html += '</div></div>';
+                if (amDriver) {
                     if (item.code) {
                         html += '<div class="mt-2 flex items-center gap-2"><span class="text-xs text-green-400">✓ 已填码</span><button class="edit-code-btn text-xs text-blue-400" data-id="' + item.id + '">编辑</button></div>';
                     } else {
