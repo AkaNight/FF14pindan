@@ -5,3 +5,7 @@ FF14商城拼单小工具
 突发奇想写着玩儿给自己和朋友用的，100%claude指导无人工（不是
 
 （真的用得上吗？）
+
+
+
+网址：https://akanight.github.io/FF14pindan/
