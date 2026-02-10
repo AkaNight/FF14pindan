@@ -154,6 +154,7 @@
     let items = [];
     let currentIdentity = null;
     let editingItemId = null;
+    let currentSubscription = null;
 
     const discountTiers = [
         {threshold: 50, discount: 10},
@@ -261,8 +262,13 @@
         if (!error) items = data || [];
     }
 
+
     function subscribeToChanges() {
-        db.channel('group-' + currentGroupId)
+        if (currentSubscription) {
+            db.removeChannel(currentSubscription);
+        }
+
+        currentSubscription = db.channel('group-' + currentGroupId)
             .on('postgres_changes', {event: '*', schema: 'public', table: 'items', filter: 'group_id=eq.' + currentGroupId}, () => {
                 loadItems().then(() => { updateIdentityButtons(); updateDisplay(); });
             })
