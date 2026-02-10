@@ -459,11 +459,10 @@
             return;
         }
         if (!confirm('确定删除？')) return;
-        const { error } = await db.from('items').delete().eq('id', id);
-        if (!error) {
-            await loadItems();
-            updateDisplay();
-        }
+        await db.from('items').delete().eq('id', id);
+        // 手动刷新
+        await loadItems();
+        updateDisplay();
     }
 
     async function togglePaid(id, current) {
