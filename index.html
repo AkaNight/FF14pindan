@@ -159,6 +159,7 @@
 (function() {
     const SUPABASE_URL = 'https://qeoyhijdiykcmdwdrqel.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlb3loaWpkaXlrY21kd2RycWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2ODg3NTEsImV4cCI6MjA4NjI2NDc1MX0.wTeG9XQMv3ui5D1fRjqXDSJDLoWwBr0E730kIlEfN0w';
+    const SITE_URL = 'https://akanight.github.io/FF14pindan/';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentUser = null;
@@ -224,10 +225,13 @@
         $('sendMagicLinkBtn').disabled = true;
         $('sendMagicLinkBtn').textContent = '发送中...';
 
+        // 写死 GitHub Pages 地址，保留当前的 URL 参数
+        const redirectUrl = SITE_URL + window.location.search;
+
         const { error } = await db.auth.signInWithOtp({
             email: email,
             options: {
-                emailRedirectTo: window.location.origin + window.location.pathname + window.location.search
+                emailRedirectTo: redirectUrl
             }
         });
 
@@ -396,7 +400,7 @@
     }
 
     function copyGroupLink() {
-        const link = window.location.origin + window.location.pathname + '?g=' + currentGroupId;
+        const link = SITE_URL + '?g=' + currentGroupId;
         navigator.clipboard.writeText(link).then(() => showToast('链接已复制！'));
     }
 
